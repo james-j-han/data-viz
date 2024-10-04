@@ -1,10 +1,12 @@
 import os
 import glob
 from PIL import Image
+import time
 import torch
 from torchvision import models, transforms
 from sklearn.manifold import TSNE
 import matplotlib.pyplot as plt
+from mpl_toolkits.mplot3d import Axes3D
 import numpy as np
 
 # Set up image preprocessing (resize, center crop, convert to tensor, normalize)
@@ -35,25 +37,34 @@ model.eval()
 # Extract features from the images
 def extract_features(image_paths):
     features = []
+    start_time = time.time()
     with torch.no_grad():
         for img_path in image_paths:
             img = load_image(img_path)
             feature = model(img).squeeze().numpy() # Extract features and flatten
             features.append(feature)
+    
+    end_time = time.time()
+    duration = end_time - start_time
+    print(f"Feature extraction took {duration:.2f} seconds.")
     return np.array(features)
 
 features = extract_features(image_paths)
 
 # Use t-SNE for dimensionality reduction
-def reduce_dimensions(features):
-    tsne = TSNE(n_components=2, random_state=42)
+def reduce_dimensions(features, n_components=2):
+    tsne = TSNE(n_components=n_components, random_state=42)
     reduced_features = tsne.fit_transform(features)
     return reduced_features
 
-reduced_features = reduce_dimensions(features)
+# Generate 2D features for scatter plot
+# reduced_features_2d = reduce_dimensions(features, n_components=2)
 
-# Scatter plot of the reduced features
-def plot_features(features, image_paths):
+# Generate 3D features for scatter plot
+reduced_features_3d = reduce_dimensions(features, n_components=3)
+
+# 2D scatter plot of the reduced features
+def plot_2d_features(features, image_paths):
     plt.figure(figsize=(10,10))
     plt.scatter(features[:, 0], features[:, 1], color='blue', alpha=0.6)
 
@@ -65,4 +76,24 @@ def plot_features(features, image_paths):
     plt.ylabel('Component 2')
     plt.show()
 
-plot_features(reduced_features, image_paths)
+# 3D scatter plot of reduced features
+def plot_3d_features(features, image_paths):
+    fig = plt.figure(figsize=(10, 10))
+    ax = fig.add_subplot(111, projection='3d')
+    ax.scatter(features[:, 0], features[:, 1], features[:, 2], color='blue', alpha=0.6)
+
+    ax.set_title('3D Feature Representation of Images')
+    ax.set_xlabel('Component 1')
+    ax.set_ylabel('Component 2')
+    ax.set_zlabel('Component 3')
+
+    # Enable interactive rotation and zoom
+    # plt.ion() # Turn on interactive mode
+
+    plt.show()
+
+    # Keep the plot open and allow interaction
+    # plt.pause(0.1) # Pause to allow for interaction
+
+# plot_2d_features(reduced_features_2d, image_paths)
+plot_3d_features(reduced_features_3d, image_paths)
