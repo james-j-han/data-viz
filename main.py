@@ -60,10 +60,10 @@ def reduce_dimensions(features, n_components=2):
     return reduced_features
 
 # Generate 2D features for scatter plot
-# reduced_features_2d = reduce_dimensions(features, n_components=2)
+reduced_features_2d = reduce_dimensions(features, n_components=2)
 
 # Generate 3D features for scatter plot
-reduced_features_3d = reduce_dimensions(features, n_components=3)
+# reduced_features_3d = reduce_dimensions(features, n_components=3)
 
 # 2D scatter plot of the reduced features
 def plot_2d_features(features, image_paths):
@@ -76,7 +76,7 @@ def plot_2d_features(features, image_paths):
     # plt.figure(figsize=(10,10))
     # plt.scatter(features[:, 0], features[:, 1], color='green', alpha=0.6)
 
-    zoom_threshold = 100.0
+    zoom_threshold = 1000.0
     images_displayed = []# Text for displaying the zoom level
     zoom_text = ax.text(0.05, 0.95, '', transform=ax.transAxes, fontsize=12, verticalalignment='top', bbox=dict(facecolor='white', alpha=0.6))
 
@@ -131,7 +131,7 @@ def plot_2d_features(features, image_paths):
     def on_scroll(event):
     # Check if the event is within the axes
         if event.inaxes == ax:
-            scale_factor = 1.2 if event.button == 'up' else 0.8  # Zoom in or out
+            scale_factor = 0.9 if event.button == 'up' else 1.1  # Zoom in or out
             xlim = ax.get_xlim()
             ylim = ax.get_ylim()
 
@@ -152,7 +152,6 @@ def plot_2d_features(features, image_paths):
         global press, x0, y0
         if event.button == 1:  # Left mouse button
             press = (event.xdata, event.ydata)
-            x0, y0 = event.xdata, event.ydata  # Store initial position
 
     def on_release(event):
         global press
@@ -161,8 +160,8 @@ def plot_2d_features(features, image_paths):
     def on_motion(event):
         global press, x0, y0
         if press is not None and event.inaxes == ax:
-            dx = event.xdata - x0
-            dy = event.ydata - y0
+            dx = event.xdata - press[0]
+            dy = event.ydata - press[1]
 
             # Only update if movement is significant
             threshold = 2
@@ -241,5 +240,5 @@ def plot_3d_features(features, image_paths):
 
     plt.show()
 
-# plot_2d_features(reduced_features_2d, image_paths)
-plot_3d_features(reduced_features_3d, image_paths)
+plot_2d_features(reduced_features_2d, image_paths)
+# plot_3d_features(reduced_features_3d, image_paths)
