@@ -1,14 +1,81 @@
 import os
 import glob
 from PIL import Image
+from PIL import ImageTk
 import time
 import torch
 from torchvision import models, transforms
 from sklearn.manifold import TSNE
+import matplotlib
+matplotlib.use("TkAgg")
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
 import numpy as np
 import matplotlib.offsetbox as offsetbox
+import tkinter as tk
+from tkinter import filedialog, Toplevel, Label, Button
+from sklearn.metrics.pairwise import euclidean_distances
+
+# Function to upload a single image
+def upload_and_query_image(top_k=5):
+    # Use Tkinter to open a file picker dialog
+    # root = tk.Tk()
+    # root.withdraw()  # Hide the root window
+    img_path = filedialog.askopenfilename(title="Select an image to query")
+    if not img_path:
+        print("No image selected")
+        return None
+
+    print(f'Uploaded image: {img_path}')
+    
+    # Extract features from the uploaded image
+    query_img = load_image(img_path)
+    with torch.no_grad():
+        query_feature = model(query_img).squeeze().numpy()
+
+    # Calculate distances and find top-k closest images
+    distances = calculate_distances(query_feature, features)
+    top_k_indices = np.argsort(distances)[:top_k]
+    top_k_images = [image_paths[i] for i in top_k_indices]
+
+    print(f"Top {top_k} closest images:")
+    for idx, img_path in enumerate(top_k_images):
+        print(f"{idx + 1}: {img_path}")
+    
+    # Display top-k closest images in a new window
+    display_top_k_images(top_k_images)
+    
+# Function to display top-k closest images in a new window
+def display_top_k_images(image_paths):
+    top_window = Toplevel()  # Create a new top-level window
+    top_window.title("Top-K Closest Images")
+
+    def on_close():
+        root.destroy()
+
+    top_window.protocol('WM_DELETE_WINDOW', on_close)
+    
+    for idx, img_path in enumerate(image_paths):
+        try:
+            img = Image.open(img_path)
+            img.thumbnail((200, 200))  # Resize for display
+            
+            # Convert to PhotoImage to display in Tkinter
+            img_tk = ImageTk.PhotoImage(img)
+            
+            label = Label(top_window, image=img_tk)
+            label.image = img_tk  # Keep reference to prevent garbage collection
+            label.grid(row=idx // 3, column=idx % 3, padx=10, pady=10)
+        except Exception as e:
+            print(f"Error displaying image {img_path}: {e}")
+
+    # Button to close the window
+    # close_button = Button(top_window, text="Close", command=root.destroy)
+
+# Calculate distances from query image to dataset images
+def calculate_distances(query_feature, features):
+    distances = euclidean_distances(query_feature.reshape(1, -1), features).flatten()
+    return distances
 
 # Set up image preprocessing (resize, center crop, convert to tensor, normalize)
 pp = transforms.Compose([
@@ -242,3 +309,9 @@ def plot_3d_features(features, image_paths):
 
 plot_2d_features(reduced_features_2d, image_paths)
 # plot_3d_features(reduced_features_3d, image_paths)
+
+if __name__ == "__main__":
+    root = tk.Tk()
+    root.withdraw()  # Hide the root window if you don’t want it
+    upload_and_query_image(top_k=5)
+    root.mainloop()  # Start the Tkinter main loop
