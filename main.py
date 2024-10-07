@@ -7,13 +7,14 @@ import torch
 from torchvision import models, transforms
 from sklearn.manifold import TSNE
 import matplotlib
-matplotlib.use("TkAgg")
+matplotlib.use("TkAgg") # IMPORTANT in this order for tkinter to run properly
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
 import numpy as np
 import matplotlib.offsetbox as offsetbox
 import tkinter as tk
 from tkinter import filedialog, Toplevel, Label, Button
+from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 from sklearn.metrics.pairwise import euclidean_distances
 
 # Function to upload a single image
@@ -134,15 +135,22 @@ reduced_features_2d = reduce_dimensions(features, n_components=2)
 # reduced_features_3d = reduce_dimensions(features, n_components=3)
 
 # 2D scatter plot of the reduced features
-def plot_2d_features(features, image_paths):
+def plot_2d_features(features, image_paths, root):
+    # Create a frame in Tkinter window to embed the plot
+    # plot_frame = tk.Frame(root)
+    # plot_frame.pack(side=tk.TOP, fill=tk.BOTH, expand=True)
+
     fig, ax = plt.subplots(figsize=(10, 10))
 
     ax.set_facecolor('lightgrey')  # Set the axes background color
     fig.patch.set_facecolor('lightgrey')  # Set the figure background color
 
     scatter = ax.scatter(features[:, 0], features[:, 1], color='green', alpha=0.6)
-    # plt.figure(figsize=(10,10))
-    # plt.scatter(features[:, 0], features[:, 1], color='green', alpha=0.6)
+    
+    # Embed the figure in Tkinter window
+    # canvas = FigureCanvasTkAgg(fig, master=plot_frame)
+    # canvas.draw()
+    # canvas.get_tk_widget().pack(side=tk.TOP, fill=tk.BOTH, expand=True)
 
     zoom_threshold = 200.0
     images_displayed = []# Text for displaying the zoom level
@@ -159,10 +167,12 @@ def plot_2d_features(features, image_paths):
     loaded_images = load_and_rezie_images(image_paths)
 
     # Variables to handle panning
-    global press, x0, y0
+    global press
     press = None
-    x0 = None
-    y0 = None
+    # global press, x0, y0
+    # press = None
+    # x0 = None
+    # y0 = None
 
     def update_images():
         for img_display in images_displayed:
@@ -194,7 +204,9 @@ def plot_2d_features(features, image_paths):
             plt.xlabel('Component 1')
             plt.ylabel('Component 2')
 
-        plt.draw()
+        fig.canvas.draw_idle()
+        # plt.draw()
+        # canvas.draw()
     
     def on_scroll(event):
     # Check if the event is within the axes
@@ -217,7 +229,7 @@ def plot_2d_features(features, image_paths):
             update_images()
     
     def on_press(event):
-        global press, x0, y0
+        global press
         if event.button == 1:  # Left mouse button
             press = (event.xdata, event.ydata)
 
@@ -226,34 +238,43 @@ def plot_2d_features(features, image_paths):
         press = None  # Reset press on release
 
     def on_motion(event):
-        global press, x0, y0
+        global press
         if press is not None and event.inaxes == ax:
             dx = event.xdata - press[0]
             dy = event.ydata - press[1]
 
+            xlim = ax.get_xlim()
+            ylim = ax.get_ylim()
+
             # Only update if movement is significant
-            threshold = 1
-            if abs(dx) > threshold or abs(dy) > threshold:
-                # Update axis limits
-                ax.set_xlim(ax.get_xlim()[0] - dx, ax.get_xlim()[1] - dx)
-                ax.set_ylim(ax.get_ylim()[0] - dy, ax.get_ylim()[1] - dy)
+            # threshold = 1
+            # if abs(dx) > threshold or abs(dy) > threshold:
+            # Update axis limits
+            ax.set_xlim(xlim[0] - dx, xlim[1] - dx)
+            ax.set_ylim(ylim[0] - dy, ylim[1] - dy)
 
-                # Update current position
-                x0, y0 = event.xdata, event.ydata
+            # Update current position
+            # x0, y0 = event.xdata, event.ydata
 
-                # Use canvas.draw_idle() for smoother updates
-                ax.figure.canvas.draw_idle()
-                # plt.draw()
+            # Use canvas.draw_idle() for smoother updates
+            # ax.figure.canvas.draw_idle()
+            # canvas.draw_idle()
+            fig.canvas.draw_idle()
         
     fig.canvas.mpl_connect('scroll_event', on_scroll)
     fig.canvas.mpl_connect('button_press_event', on_press)
     fig.canvas.mpl_connect('button_release_event', on_release)
     fig.canvas.mpl_connect('motion_notify_event', on_motion)
     
-    plt.title('2D Feature Representation of Images')
-    plt.xlabel('Component 1')
-    plt.ylabel('Component 2')
-    plt.show()
+    # plt.title('2D Feature Representation of Images')
+    # plt.xlabel('Component 1')
+    # plt.ylabel('Component 2')
+    # plt.show()
+
+    # Embed the plot in the Tkinter window
+    canvas = FigureCanvasTkAgg(fig, master=root)
+    canvas.draw()
+    canvas.get_tk_widget().pack(fill=tk.BOTH, expand=True)
 
 # 3D scatter plot of reduced features
 def plot_3d_features(features, image_paths):
@@ -308,11 +329,24 @@ def plot_3d_features(features, image_paths):
 
     plt.show()
 
-plot_2d_features(reduced_features_2d, image_paths)
+# plot_2d_features(reduced_features_2d, image_paths)
 # plot_3d_features(reduced_features_3d, image_paths)
 
 if __name__ == "__main__":
     root = tk.Tk()
-    root.withdraw()  # Hide the root window if you don’t want it
-    upload_and_query_image(top_k=5)
+    root.title('Data Viz')
+
+    # Define a function that will be called when the window is closed
+    def on_close():
+        print("Window closed")  # You can perform any cleanup here
+        root.quit() # Stop the Tkinter main loop
+        root.destroy()  # Close the Tkinter window
+
+    # Bind the window close event (WM_DELETE_WINDOW is triggered when you click the "X")
+    root.protocol("WM_DELETE_WINDOW", on_close)
+
+    # root.withdraw()  # Hide the root window if you don’t want it
+    # Call the plot function to display the scatter plot in tkinter window
+    plot_2d_features(reduced_features_2d, image_paths, root)
+    # upload_and_query_image(top_k=5)
     root.mainloop()  # Start the Tkinter main loop
