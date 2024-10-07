@@ -135,12 +135,16 @@ def plot_2d_features(features, image_paths):
             xlim = ax.get_xlim()
             ylim = ax.get_ylim()
 
-            # Calculate new limits
+            # Calculate the current center of the axes
+            x_center = (xlim[1] + xlim[0]) / 2
+            y_center = (ylim[1] + ylim[0]) / 2
+
+            # Calculate new limites, keep the zoom centered
             new_xrange = (xlim[1] - xlim[0]) * scale_factor
             new_yrange = (ylim[1] - ylim[0]) * scale_factor
 
-            ax.set_xlim([event.xdata - new_xrange / 2, event.xdata + new_xrange / 2])
-            ax.set_ylim([event.ydata - new_yrange / 2, event.ydata + new_yrange / 2])
+            ax.set_xlim([x_center - new_xrange / 2, x_center + new_xrange / 2])
+            ax.set_ylim([y_center - new_yrange / 2, y_center + new_yrange / 2])
             
             update_images()
     
