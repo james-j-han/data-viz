@@ -60,10 +60,10 @@ def reduce_dimensions(features, n_components=2):
     return reduced_features
 
 # Generate 2D features for scatter plot
-reduced_features_2d = reduce_dimensions(features, n_components=2)
+# reduced_features_2d = reduce_dimensions(features, n_components=2)
 
 # Generate 3D features for scatter plot
-# reduced_features_3d = reduce_dimensions(features, n_components=3)
+reduced_features_3d = reduce_dimensions(features, n_components=3)
 
 # 2D scatter plot of the reduced features
 def plot_2d_features(features, image_paths):
@@ -164,13 +164,19 @@ def plot_2d_features(features, image_paths):
             dx = event.xdata - x0
             dy = event.ydata - y0
 
-            if abs(dx) > 1 or abs(dy) > 1: # Only update if movement is significant
-            # Update axis limits
+            # Only update if movement is significant
+            threshold = 2
+            if abs(dx) > threshold or abs(dy) > threshold:
+                # Update axis limits
                 ax.set_xlim(ax.get_xlim()[0] - dx, ax.get_xlim()[1] - dx)
                 ax.set_ylim(ax.get_ylim()[0] - dy, ax.get_ylim()[1] - dy)
 
-                x0, y0 = event.xdata, event.ydata  # Update current position
-                plt.draw()
+                # Update current position
+                x0, y0 = event.xdata, event.ydata
+
+                # Use canvas.draw_idle() for smoother updates
+                ax.figure.canvas.draw_idle()
+                # plt.draw()
         
     fig.canvas.mpl_connect('scroll_event', on_scroll)
     fig.canvas.mpl_connect('button_press_event', on_press)
@@ -184,81 +190,18 @@ def plot_2d_features(features, image_paths):
 
 # 3D scatter plot of reduced features
 def plot_3d_features(features, image_paths):
+    # Create a figure and 3D axis
     fig = plt.figure(figsize=(10, 10))
     ax = fig.add_subplot(111, projection='3d')
-    ax.scatter(features[:, 0], features[:, 1], features[:, 2], color='blue', alpha=0.6)
-    ax.autoscale(False)
 
-    # Force the view to look like a 2D plot by setting elevation and azimuth
-    # ax.view_init(elev=90, azim=-90)
+    # Plot 3D points
+    ax.scatter(features[:, 0], features[:, 1], features[:, 2], color='orange', alpha=0.6)
 
     ax.set_title('3D Feature Representation of Images')
     ax.set_xlabel('X')
     ax.set_ylabel('Y')
     ax.set_zlabel('Z')
-
-    # Set zoom threshold
-    zoom_threshold = 10000.0 # Adjust this value to set how close you need to zoom in to show images
-    images_displayed = [] # Store the images displayed to prevent re-adding
-    zoom_text = ax.text2D(0.05, 0.95, '', transform=ax.transAxes) # Text for zoom level
-
-    # Preload and resize images
-    def preprocess_image(img_path):
-        img = Image.open(img_path).convert('RGB').resize((50, 50))
-        return np.array(img) / 255.0
-    
-    images = [preprocess_image(img_path) for img_path in image_paths]
-    
-    # Callback to check the zoom level and display images
-    def update_images():
-        for img in images_displayed:
-            if img in ax.collections:
-                img.remove()
-        images_displayed.clear()
-
-        # Check the current limits to determine zoom level
-        xlim = ax.get_xlim()
-        ylim = ax.get_ylim()
-        zlim = ax.get_zlim()
-
-        # Set the initial view so the z-axis is towards the viewer
-        # ax.view_init(elev=90, azim=0)  # Elevation of 90 degrees and azimuth of 0 degrees
-
-        # Calculate the current zoom level
-        zoom_level = (xlim[1] - xlim[0]) * (ylim[1] - ylim[0]) * (zlim[1] - zlim[0])
-
-        # Update zoom level text
-        zoom_text.set_text(f'Zoom Level: {zoom_level:.2f}')
-
-        if zoom_level < zoom_threshold:
-            # Filter features within the current limits
-            for i, (x, y, z) in enumerate(features):
-                # x, y, z = features[i]
-                # img_path = image_paths[i]
-                if (xlim[0] <= x <= xlim[1]) and (ylim[0] <= y <= ylim[1]) and (zlim[0] <= z <= zlim[1]):
-                    img_array = images[i]
-                
-                    # Dynamically scale image size based on zoom level
-                    img_size = max(50, 100 / (zoom_level ** 0.5))
-
-                    x_mesh, y_mesh = np.meshgrid(
-                        np.linspace(-img_size / 200, img_size / 200, 20),
-                        np.linspace(-img_size / 200, img_size / 200, 20)
-                    )
-                    z_mesh = np.zeros_like(x_mesh) + z
-                    
-                    # Plot the image as a surface
-                    surf = ax.plot_surface(x_mesh + x, y_mesh + y, z_mesh, rstride=1, cstride=1, facecolors=img_array, alpha=1, antialiased=False)
-                    images_displayed.append(surf)
-    
-    def on_zoom(event):
-        if event.inaxes == ax:
-            update_images()
-            plt.draw()
-
-    fig.canvas.mpl_connect('button_release_event', on_zoom)
-    # fig.canvas.mpl_connect('motion_notify_event', on_zoom)
     plt.show()
 
-plot_2d_features(reduced_features_2d, image_paths)
-# plot_3d_features(reduced_features_3d, image_paths)
+# plot_2d_features(reduced_features_2d, image_paths)
+plot_3d_features(reduced_features_3d, image_paths)
