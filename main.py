@@ -143,7 +143,7 @@ def plot_2d_features(features, image_paths):
     # plt.figure(figsize=(10,10))
     # plt.scatter(features[:, 0], features[:, 1], color='green', alpha=0.6)
 
-    zoom_threshold = 1000.0
+    zoom_threshold = 200.0
     images_displayed = []# Text for displaying the zoom level
     zoom_text = ax.text(0.05, 0.95, '', transform=ax.transAxes, fontsize=12, verticalalignment='top', bbox=dict(facecolor='white', alpha=0.6))
 
@@ -198,7 +198,7 @@ def plot_2d_features(features, image_paths):
     def on_scroll(event):
     # Check if the event is within the axes
         if event.inaxes == ax:
-            scale_factor = 0.9 if event.button == 'up' else 1.1  # Zoom in or out
+            scale_factor = 0.95 if event.button == 'up' else 1.05  # Zoom in or out
             xlim = ax.get_xlim()
             ylim = ax.get_ylim()
 
@@ -231,7 +231,7 @@ def plot_2d_features(features, image_paths):
             dy = event.ydata - press[1]
 
             # Only update if movement is significant
-            threshold = 2
+            threshold = 1
             if abs(dx) > threshold or abs(dy) > threshold:
                 # Update axis limits
                 ax.set_xlim(ax.get_xlim()[0] - dx, ax.get_xlim()[1] - dx)
