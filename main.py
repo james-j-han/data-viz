@@ -132,7 +132,7 @@ def reduce_dimensions(features, n_components=2):
 reduced_features_2d = reduce_dimensions(features, n_components=2)
 
 # Generate 3D features for scatter plot
-# reduced_features_3d = reduce_dimensions(features, n_components=3)
+reduced_features_3d = reduce_dimensions(features, n_components=3)
 
 # 2D scatter plot of the reduced features
 def plot_2d_features(features, image_paths, root):
@@ -142,8 +142,8 @@ def plot_2d_features(features, image_paths, root):
 
     fig, ax = plt.subplots(figsize=(10, 10))
 
-    ax.set_facecolor('lightgrey')  # Set the axes background color
-    fig.patch.set_facecolor('lightgrey')  # Set the figure background color
+    # ax.set_facecolor('lightgrey')  # Set the axes background color
+    # fig.patch.set_facecolor('lightgrey')  # Set the figure background color
 
     scatter = ax.scatter(features[:, 0], features[:, 1], color='green', alpha=0.6)
     
@@ -274,10 +274,10 @@ def plot_2d_features(features, image_paths, root):
     # Embed the plot in the Tkinter window
     canvas = FigureCanvasTkAgg(fig, master=root)
     canvas.draw()
-    canvas.get_tk_widget().pack(fill=tk.BOTH, expand=True)
+    canvas.get_tk_widget().pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
 
 # 3D scatter plot of reduced features
-def plot_3d_features(features, image_paths):
+def plot_3d_features(features, image_paths, root):
     # Create a figure and 3D axis
     fig = plt.figure(figsize=(10, 10))
     ax = fig.add_subplot(111, projection='3d')
@@ -322,12 +322,18 @@ def plot_3d_features(features, image_paths):
             ax.set_zlim([z_center - (z_center - zlim[0]) * (1 + zoom_factor),
                           z_center + (zlim[1] - z_center) * (1 + zoom_factor)])
         
-        plt.draw()
+        # plt.draw()
+        fig.canvas.draw_idle()
     
     # Connect the scroll event
     fig.canvas.mpl_connect('scroll_event', on_scroll)
 
-    plt.show()
+    # Embed the plot in the Tkinter window
+    canvas = FigureCanvasTkAgg(fig, master=root)
+    canvas.draw()
+    canvas.get_tk_widget().pack(side=tk.RIGHT, fill=tk.BOTH, expand=True)
+
+    # plt.show()
 
 # plot_2d_features(reduced_features_2d, image_paths)
 # plot_3d_features(reduced_features_3d, image_paths)
@@ -345,8 +351,13 @@ if __name__ == "__main__":
     # Bind the window close event (WM_DELETE_WINDOW is triggered when you click the "X")
     root.protocol("WM_DELETE_WINDOW", on_close)
 
+    # Create a frame for the 2D and 3D plots
+    plot_frame = tk.Frame(root)
+    plot_frame.pack(fill=tk.BOTH, expand=True)
+
     # root.withdraw()  # Hide the root window if you don’t want it
     # Call the plot function to display the scatter plot in tkinter window
-    plot_2d_features(reduced_features_2d, image_paths, root)
+    plot_2d_features(reduced_features_2d, image_paths, plot_frame)
+    plot_3d_features(reduced_features_3d, image_paths, plot_frame)
     # upload_and_query_image(top_k=5)
     root.mainloop()  # Start the Tkinter main loop
