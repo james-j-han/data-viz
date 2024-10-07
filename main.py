@@ -24,6 +24,7 @@ def upload_and_query_image(top_k=5):
     img_path = filedialog.askopenfilename(title="Select an image to query")
     if not img_path:
         print("No image selected")
+        root.destroy()
         return None
 
     print(f'Uploaded image: {img_path}')
