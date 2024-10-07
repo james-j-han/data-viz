@@ -201,6 +201,44 @@ def plot_3d_features(features, image_paths):
     ax.set_xlabel('X')
     ax.set_ylabel('Y')
     ax.set_zlabel('Z')
+    # plt.show()
+
+    # Scroll event to control zoom
+    def on_scroll(event):
+        # Get current limits
+        xlim = ax.get_xlim()
+        ylim = ax.get_ylim()
+        zlim = ax.get_zlim()
+
+        # Calculate the center of the current view
+        x_center = (xlim[1] + xlim[0]) / 2
+        y_center = (ylim[1] + ylim[0]) / 2
+        z_center = (zlim[1] + zlim[0]) / 2
+
+        # Zoom factor
+        zoom_factor = 0.1
+
+        # Adjust limits based on scroll direction
+        if event.button == 'up':  # Zoom in
+            ax.set_xlim([x_center - (x_center - xlim[0]) * (1 - zoom_factor),
+                          x_center + (xlim[1] - x_center) * (1 - zoom_factor)])
+            ax.set_ylim([y_center - (y_center - ylim[0]) * (1 - zoom_factor),
+                          y_center + (ylim[1] - y_center) * (1 - zoom_factor)])
+            ax.set_zlim([z_center - (z_center - zlim[0]) * (1 - zoom_factor),
+                          z_center + (zlim[1] - z_center) * (1 - zoom_factor)])
+        elif event.button == 'down':  # Zoom out
+            ax.set_xlim([x_center - (x_center - xlim[0]) * (1 + zoom_factor),
+                          x_center + (xlim[1] - x_center) * (1 + zoom_factor)])
+            ax.set_ylim([y_center - (y_center - ylim[0]) * (1 + zoom_factor),
+                          y_center + (ylim[1] - y_center) * (1 + zoom_factor)])
+            ax.set_zlim([z_center - (z_center - zlim[0]) * (1 + zoom_factor),
+                          z_center + (zlim[1] - z_center) * (1 + zoom_factor)])
+        
+        plt.draw()
+    
+    # Connect the scroll event
+    fig.canvas.mpl_connect('scroll_event', on_scroll)
+
     plt.show()
 
 # plot_2d_features(reduced_features_2d, image_paths)
