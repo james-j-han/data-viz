@@ -8,6 +8,8 @@ torch = "*"
 torchvision = "*"
 matplotlib = "*"
 scikit-learn = "*"
+requests = "*"
+openai = "*"
 
 [dev-packages]
 
