@@ -26,30 +26,75 @@ def get_api_key(file_path='api_key.txt'):
         return file.read().strip()
 
 client = openai.OpenAI(api_key=get_api_key())
-# openai.api_key = get_api_key()
 
 # Function to generate image from text input
 def generate_image_from_text(text):
-    response = client.images.generate(
-        model='dall-e-3',
-        prompt=text,
-        size='1024x1024',
-        n=1,
-        quality='standard'
-    )
+    try:
+        response = client.images.generate(
+            model='dall-e-3',
+            prompt=text,
+            size='1024x1024',
+            n=1,
+            quality='standard'
+        )
+        image_url = response.data[0].url
+        print('Generated Image URL:', image_url)
+        return image_url
+    except Exception as e:
+        print(f"Error generating image: {e}")
+        return None
 
-    image_url = response.data[0].url
-    print('Generated Image URL:', image_url)
-    return image_url
-    # return response['data'][0]['url']
+# Global variables
+features = []
+existing_features_2d = None
+existing_features_3d = None
+fig2d, ax2 = None, None
+fig3d, ax3 = None, None
 
 # Update the command in your button to include text input
 def on_query_button_click(prompt):
-    text_input = prompt
-    image_url = generate_image_from_text(text_input)
-    
-    # Display the generated image in a new window
-    display_image_window(image_url)
+    image_url = generate_image_from_text(prompt)
+    # print(image_url)
+
+    if image_url:
+        # Load the generated image
+        # new_image = Image.open(requests.get(image_url, stream=True).raw)
+        # new_image = new_image.convert('RGB')  # Ensure it's RGB format
+        # new_image = pp(new_image).unsqueeze(0)  # Preprocess for the model
+        
+        # Extract features
+        print('Image URL from generate image: ', image_url)
+        updated_features = extract_features([image_url]) # Need to pass as array
+
+        # Append new features to existing features
+        # features.append(new_feature)
+
+        # Update the plots with the new point
+        update_plots(updated_features)
+
+        # Display the generated image in a new window
+        display_image_window(image_url)
+
+def update_plots(new_feature):
+    # global existing_features_2d, existing_features_3d
+
+    # Append new feature for 2D and 3D plots
+    existing_features_2d = reduce_dimensions(new_feature, n_components=2)
+    existing_features_3d = reduce_dimensions(new_feature, n_components=3)
+
+    # Update 2D plot
+    ax2.clear()  # Clear previous 2D scatter plot
+    ax2.scatter(existing_features_2d[:, 0], existing_features_2d[:, 1], color='green', alpha=0.6)
+    ax2.scatter(existing_features_2d[-1, 0], existing_features_2d[-1, 1], color='red', s=100, label='New Image')  # New point in red
+    ax2.legend()
+    fig2d.canvas.draw_idle()  # Redraw 2D plot
+
+    # Update 3D plot
+    ax3.clear()  # Clear previous 3D scatter plot
+    ax3.scatter(existing_features_3d[:, 0], existing_features_3d[:, 1], existing_features_3d[:, 2], color='orange', alpha=0.6)
+    ax3.scatter(existing_features_3d[-1, 0], existing_features_3d[-1, 1], existing_features_3d[-1, 2], color='red', s=100, label='New Image')  # New point in red
+    ax3.legend()
+    fig3d.canvas.draw_idle()  # Redraw 3D plot
 
 def display_image_window(image_url):
     new_window = Toplevel()  # Create a new top-level window
@@ -145,15 +190,27 @@ pp = transforms.Compose([
 # Load the images from a directory
 image_dir = 'images/animals/animals/'
 image_paths = glob.glob(os.path.join(image_dir, '**', '*.*'), recursive=True)
-# image_paths = [img_path for img_path in image_paths]
-# for img_path in image_paths:
-#     print(img_path)
 print(f'Loaded {len(image_paths)} images from {image_dir}')
 
-def load_image(img_path):
-    img = Image.open(img_path).convert('RGB')
-    img = pp(img).unsqueeze(0)
-    return img
+def load_image(img_path_or_url):
+    if not img_path_or_url:  # Check if the path or URL is empty
+        raise ValueError("No valid image path or URL provided")
+    # Handle image path or image url
+    url = img_path_or_url.lower().strip()
+    # print(url)
+    if url.startswith('http://') or url.startswith('https://'):
+        print(img_path_or_url)
+        response = requests.get(img_path_or_url, stream=True)
+        response.raise_for_status()  # Check if the request was successful
+        # img = Image.open(BytesIO(response.content)).convert('RGB')
+        img = Image.open(response.raw)
+        print(img)
+    else:
+        img = Image.open(img_path_or_url)
+
+    img.convert('RGB')
+    img_tensor = pp(img).unsqueeze(0)
+    return img_tensor
 
 # Load pre-trained ResNet model and remove the final classification layer
 model = models.resnet50(weights='IMAGENET1K_V1')
@@ -162,26 +219,32 @@ model.eval()
 
 # Extract features from the images
 def extract_features(image_paths):
-    features = []
+    # print('Extract Features: ', image_paths)
+    # features = []
     start_time = time.time()
     with torch.no_grad():
         for img_path in image_paths:
-            img = load_image(img_path)
-            feature = model(img).squeeze().numpy() # Extract features and flatten
+            img_tensor = load_image(img_path)
+            feature = model(img_tensor).squeeze().numpy() # Extract features and flatten
             features.append(feature)
     
     end_time = time.time()
     duration = end_time - start_time
     print(f"Feature extraction took {duration:.2f} seconds.")
-    return np.array(features)
+    # return np.array(features)
+    return features
 
 features = extract_features(image_paths)
 
 # Use t-SNE for dimensionality reduction
 def reduce_dimensions(features, n_components=2):
+    features_to_reduce = convert_to_nparray(features)
     tsne = TSNE(n_components=n_components, random_state=42)
-    reduced_features = tsne.fit_transform(features)
+    reduced_features = tsne.fit_transform(features_to_reduce)
     return reduced_features
+
+def convert_to_nparray(array_to_convert):
+    return np.array(array_to_convert)
 
 # Generate 2D features for scatter plot
 reduced_features_2d = reduce_dimensions(features, n_components=2)
@@ -195,12 +258,13 @@ def plot_2d_features(features, image_paths, root):
     # plot_frame = tk.Frame(root)
     # plot_frame.pack(side=tk.TOP, fill=tk.BOTH, expand=True)
 
-    fig, ax = plt.subplots(figsize=(10, 10))
+    global fig2d, ax2
+    fig2d, ax2 = plt.subplots(figsize=(10, 10))
 
     # ax.set_facecolor('lightgrey')  # Set the axes background color
     # fig.patch.set_facecolor('lightgrey')  # Set the figure background color
 
-    scatter = ax.scatter(features[:, 0], features[:, 1], color='green', alpha=0.6)
+    scatter = ax2.scatter(features[:, 0], features[:, 1], color='green', alpha=0.6)
     
     # Embed the figure in Tkinter window
     # canvas = FigureCanvasTkAgg(fig, master=plot_frame)
@@ -209,17 +273,17 @@ def plot_2d_features(features, image_paths, root):
 
     zoom_threshold = 200.0
     images_displayed = []# Text for displaying the zoom level
-    zoom_text = ax.text(0.05, 0.95, '', transform=ax.transAxes, fontsize=12, verticalalignment='top', bbox=dict(facecolor='white', alpha=0.6))
+    zoom_text = ax2.text(0.05, 0.95, '', transform=ax2.transAxes, fontsize=12, verticalalignment='top', bbox=dict(facecolor='white', alpha=0.6))
 
     # Load images and resize
-    def load_and_rezie_images(image_paths, size=(50, 50)):
+    def load_and_resize_images(image_paths, size=(50, 50)):
         images = []
         for path in image_paths:
             image = Image.open(path).resize(size)
             images.append(image)
         return images
     
-    loaded_images = load_and_rezie_images(image_paths)
+    loaded_images = load_and_resize_images(image_paths)
 
     # Variables to handle panning
     global press
@@ -234,8 +298,8 @@ def plot_2d_features(features, image_paths, root):
             img_display.remove()
         images_displayed.clear()
 
-        xlim = ax.get_xlim()
-        ylim = ax.get_ylim()
+        xlim = ax2.get_xlim()
+        ylim = ax2.get_ylim()
 
         zoom_level = (xlim[1] - xlim[0]) * (ylim[1] - ylim[0])
 
@@ -250,25 +314,25 @@ def plot_2d_features(features, image_paths, root):
                         (features[i, 0], features[i, 1]),
                         frameon=False
                     )
-                    ax.add_artist(imagebox)
+                    ax2.add_artist(imagebox)
                     images_displayed.append(imagebox)
         else:
             # ax.cla() # Clear the axis if the zoom level is not within the threshold
-            ax.scatter(features[:, 0], features[:, 1], color='green', alpha=0.6)
+            ax2.scatter(features[:, 0], features[:, 1], color='green', alpha=0.6)
             plt.title('2D Feature Representation of Images')
             plt.xlabel('Component 1')
             plt.ylabel('Component 2')
 
-        fig.canvas.draw_idle()
+        fig2d.canvas.draw_idle()
         # plt.draw()
         # canvas.draw()
     
     def on_scroll(event):
     # Check if the event is within the axes
-        if event.inaxes == ax:
+        if event.inaxes == ax2:
             scale_factor = 0.95 if event.button == 'up' else 1.05  # Zoom in or out
-            xlim = ax.get_xlim()
-            ylim = ax.get_ylim()
+            xlim = ax2.get_xlim()
+            ylim = ax2.get_ylim()
 
             # Calculate the current center of the axes
             x_center = (xlim[1] + xlim[0]) / 2
@@ -278,8 +342,8 @@ def plot_2d_features(features, image_paths, root):
             new_xrange = (xlim[1] - xlim[0]) * scale_factor
             new_yrange = (ylim[1] - ylim[0]) * scale_factor
 
-            ax.set_xlim([x_center - new_xrange / 2, x_center + new_xrange / 2])
-            ax.set_ylim([y_center - new_yrange / 2, y_center + new_yrange / 2])
+            ax2.set_xlim([x_center - new_xrange / 2, x_center + new_xrange / 2])
+            ax2.set_ylim([y_center - new_yrange / 2, y_center + new_yrange / 2])
             
             update_images()
     
@@ -294,19 +358,19 @@ def plot_2d_features(features, image_paths, root):
 
     def on_motion(event):
         global press
-        if press is not None and event.inaxes == ax:
+        if press is not None and event.inaxes == ax2:
             dx = event.xdata - press[0]
             dy = event.ydata - press[1]
 
-            xlim = ax.get_xlim()
-            ylim = ax.get_ylim()
+            xlim = ax2.get_xlim()
+            ylim = ax2.get_ylim()
 
             # Only update if movement is significant
             # threshold = 1
             # if abs(dx) > threshold or abs(dy) > threshold:
             # Update axis limits
-            ax.set_xlim(xlim[0] - dx, xlim[1] - dx)
-            ax.set_ylim(ylim[0] - dy, ylim[1] - dy)
+            ax2.set_xlim(xlim[0] - dx, xlim[1] - dx)
+            ax2.set_ylim(ylim[0] - dy, ylim[1] - dy)
 
             # Update current position
             # x0, y0 = event.xdata, event.ydata
@@ -314,12 +378,12 @@ def plot_2d_features(features, image_paths, root):
             # Use canvas.draw_idle() for smoother updates
             # ax.figure.canvas.draw_idle()
             # canvas.draw_idle()
-            fig.canvas.draw_idle()
+            fig2d.canvas.draw_idle()
         
-    fig.canvas.mpl_connect('scroll_event', on_scroll)
-    fig.canvas.mpl_connect('button_press_event', on_press)
-    fig.canvas.mpl_connect('button_release_event', on_release)
-    fig.canvas.mpl_connect('motion_notify_event', on_motion)
+    fig2d.canvas.mpl_connect('scroll_event', on_scroll)
+    fig2d.canvas.mpl_connect('button_press_event', on_press)
+    fig2d.canvas.mpl_connect('button_release_event', on_release)
+    fig2d.canvas.mpl_connect('motion_notify_event', on_motion)
     
     plt.title('2D Feature Representation of Images')
     plt.xlabel('X')
@@ -327,31 +391,32 @@ def plot_2d_features(features, image_paths, root):
     # plt.show()
 
     # Embed the plot in the Tkinter window
-    canvas = FigureCanvasTkAgg(fig, master=root)
+    canvas = FigureCanvasTkAgg(fig2d, master=root)
     canvas.draw()
     canvas.get_tk_widget().pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
 
 # 3D scatter plot of reduced features
 def plot_3d_features(features, image_paths, root):
     # Create a figure and 3D axis
-    fig = plt.figure(figsize=(10, 10))
-    ax = fig.add_subplot(111, projection='3d')
+    global fig3d, ax3
+    fig3d = plt.figure(figsize=(10, 10))
+    ax3 = fig3d.add_subplot(111, projection='3d')
 
     # Plot 3D points
-    ax.scatter(features[:, 0], features[:, 1], features[:, 2], color='orange', alpha=0.6)
+    ax3.scatter(features[:, 0], features[:, 1], features[:, 2], color='orange', alpha=0.6)
 
-    ax.set_title('3D Feature Representation of Images')
-    ax.set_xlabel('X')
-    ax.set_ylabel('Y')
-    ax.set_zlabel('Z')
+    ax3.set_title('3D Feature Representation of Images')
+    ax3.set_xlabel('X')
+    ax3.set_ylabel('Y')
+    ax3.set_zlabel('Z')
     # plt.show()
 
     # Scroll event to control zoom
     def on_scroll(event):
         # Get current limits
-        xlim = ax.get_xlim()
-        ylim = ax.get_ylim()
-        zlim = ax.get_zlim()
+        xlim = ax3.get_xlim()
+        ylim = ax3.get_ylim()
+        zlim = ax3.get_zlim()
 
         # Calculate the center of the current view
         x_center = (xlim[1] + xlim[0]) / 2
@@ -363,28 +428,28 @@ def plot_3d_features(features, image_paths, root):
 
         # Adjust limits based on scroll direction
         if event.button == 'up':  # Zoom in
-            ax.set_xlim([x_center - (x_center - xlim[0]) * (1 - zoom_factor),
+            ax3.set_xlim([x_center - (x_center - xlim[0]) * (1 - zoom_factor),
                           x_center + (xlim[1] - x_center) * (1 - zoom_factor)])
-            ax.set_ylim([y_center - (y_center - ylim[0]) * (1 - zoom_factor),
+            ax3.set_ylim([y_center - (y_center - ylim[0]) * (1 - zoom_factor),
                           y_center + (ylim[1] - y_center) * (1 - zoom_factor)])
-            ax.set_zlim([z_center - (z_center - zlim[0]) * (1 - zoom_factor),
+            ax3.set_zlim([z_center - (z_center - zlim[0]) * (1 - zoom_factor),
                           z_center + (zlim[1] - z_center) * (1 - zoom_factor)])
         elif event.button == 'down':  # Zoom out
-            ax.set_xlim([x_center - (x_center - xlim[0]) * (1 + zoom_factor),
+            ax3.set_xlim([x_center - (x_center - xlim[0]) * (1 + zoom_factor),
                           x_center + (xlim[1] - x_center) * (1 + zoom_factor)])
-            ax.set_ylim([y_center - (y_center - ylim[0]) * (1 + zoom_factor),
+            ax3.set_ylim([y_center - (y_center - ylim[0]) * (1 + zoom_factor),
                           y_center + (ylim[1] - y_center) * (1 + zoom_factor)])
-            ax.set_zlim([z_center - (z_center - zlim[0]) * (1 + zoom_factor),
+            ax3.set_zlim([z_center - (z_center - zlim[0]) * (1 + zoom_factor),
                           z_center + (zlim[1] - z_center) * (1 + zoom_factor)])
         
         # plt.draw()
-        fig.canvas.draw_idle()
+        fig3d.canvas.draw_idle()
     
     # Connect the scroll event
-    fig.canvas.mpl_connect('scroll_event', on_scroll)
+    fig3d.canvas.mpl_connect('scroll_event', on_scroll)
 
     # Embed the plot in the Tkinter window
-    canvas = FigureCanvasTkAgg(fig, master=root)
+    canvas = FigureCanvasTkAgg(fig3d, master=root)
     canvas.draw()
     canvas.get_tk_widget().pack(side=tk.RIGHT, fill=tk.BOTH, expand=True)
 
