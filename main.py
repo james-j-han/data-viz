@@ -100,6 +100,11 @@ def display_image_window(image_url):
     new_window = Toplevel()  # Create a new top-level window
     new_window.title("Generated Image")
 
+    def on_close():
+        new_window.destroy()
+
+    new_window.protocol('WM_DELETE_WINDOW', on_close)
+
     try:
         # Fetch the image from the URL
         response = requests.get(image_url)
@@ -116,7 +121,7 @@ def display_image_window(image_url):
     except Exception as e:
         print(f"Error loading image from URL: {e}")
 
-    new_window.mainloop()
+    # new_window.mainloop()
 
 # Function to upload a single image
 def upload_and_query_image(top_k=5):
