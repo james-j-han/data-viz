@@ -1,3 +1,4 @@
+from io import BytesIO
 import os
 import glob
 from PIL import Image
@@ -13,19 +14,73 @@ from mpl_toolkits.mplot3d import Axes3D
 import numpy as np
 import matplotlib.offsetbox as offsetbox
 import tkinter as tk
+import tkinter.ttk as ttk
 from tkinter import filedialog, Toplevel, Label, Button
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 from sklearn.metrics.pairwise import euclidean_distances
+import requests
+import openai
+
+def get_api_key(file_path='api_key.txt'):
+    with open(file_path, 'r') as file:
+        return file.read().strip()
+
+client = openai.OpenAI(api_key=get_api_key())
+# openai.api_key = get_api_key()
+
+# Function to generate image from text input
+def generate_image_from_text(text):
+    response = client.images.generate(
+        model='dall-e-3',
+        prompt=text,
+        size='1024x1024',
+        n=1,
+        quality='standard'
+    )
+
+    image_url = response.data[0].url
+    print('Generated Image URL:', image_url)
+    return image_url
+    # return response['data'][0]['url']
+
+# Update the command in your button to include text input
+def on_query_button_click(prompt):
+    text_input = prompt
+    image_url = generate_image_from_text(text_input)
+    
+    # Display the generated image in a new window
+    display_image_window(image_url)
+
+def display_image_window(image_url):
+    new_window = Toplevel()  # Create a new top-level window
+    new_window.title("Generated Image")
+
+    try:
+        # Fetch the image from the URL
+        response = requests.get(image_url)
+        img_data = Image.open(BytesIO(response.content))
+        img_data.thumbnail((800, 800))  # Resize for display, if needed
+
+        # Convert to PhotoImage to display in Tkinter
+        img_tk = ImageTk.PhotoImage(img_data)
+
+        label = Label(new_window, image=img_tk)
+        label.image = img_tk  # Keep reference to avoid garbage collection
+        label.pack()
+
+    except Exception as e:
+        print(f"Error loading image from URL: {e}")
+
+    new_window.mainloop()
 
 # Function to upload a single image
 def upload_and_query_image(top_k=5):
-    # Use Tkinter to open a file picker dialog
-    # root = tk.Tk()
-    # root.withdraw()  # Hide the root window
+    print(f"Selected integer: {top_k}")
+    k = int(top_k)
     img_path = filedialog.askopenfilename(title="Select an image to query")
     if not img_path:
         print("No image selected")
-        root.destroy()
+        # root.destroy()
         return None
 
     print(f'Uploaded image: {img_path}')
@@ -37,23 +92,23 @@ def upload_and_query_image(top_k=5):
 
     # Calculate distances and find top-k closest images
     distances = calculate_distances(query_feature, features)
-    top_k_indices = np.argsort(distances)[:top_k]
+    top_k_indices = np.argsort(distances)[:k]
     top_k_images = [image_paths[i] for i in top_k_indices]
 
-    print(f"Top {top_k} closest images:")
+    print(f"Top {k} closest images:")
     for idx, img_path in enumerate(top_k_images):
         print(f"{idx + 1}: {img_path}")
     
     # Display top-k closest images in a new window
-    display_top_k_images(top_k_images)
+    display_top_k_images(top_k_images, k)
     
 # Function to display top-k closest images in a new window
-def display_top_k_images(image_paths):
+def display_top_k_images(image_paths, k):
     top_window = Toplevel()  # Create a new top-level window
-    top_window.title("Top-K Closest Images")
+    top_window.title(f"Top-{k} Closest Images")
 
     def on_close():
-        root.destroy()
+        top_window.destroy()
 
     top_window.protocol('WM_DELETE_WINDOW', on_close)
     
@@ -266,9 +321,9 @@ def plot_2d_features(features, image_paths, root):
     fig.canvas.mpl_connect('button_release_event', on_release)
     fig.canvas.mpl_connect('motion_notify_event', on_motion)
     
-    # plt.title('2D Feature Representation of Images')
-    # plt.xlabel('Component 1')
-    # plt.ylabel('Component 2')
+    plt.title('2D Feature Representation of Images')
+    plt.xlabel('X')
+    plt.ylabel('Y')
     # plt.show()
 
     # Embed the plot in the Tkinter window
@@ -355,9 +410,32 @@ if __name__ == "__main__":
     plot_frame = tk.Frame(root)
     plot_frame.pack(fill=tk.BOTH, expand=True)
 
+    # Create a dropdown (Combobox) with integer values
+    int_values = list(range(1, 20))  # List of integers from 1 to 10
+    dropdown = ttk.Combobox(root, values=int_values, state='readonly')  # Set state to readonly
+    dropdown.pack(side=tk.LEFT, padx=(0, 2), pady=10)  # Pack the dropdown on the left side
+
     # root.withdraw()  # Hide the root window if you don’t want it
     # Call the plot function to display the scatter plot in tkinter window
     plot_2d_features(reduced_features_2d, image_paths, plot_frame)
     plot_3d_features(reduced_features_3d, image_paths, plot_frame)
+    query_by_image_button = tk.Button(
+        root,
+        text="Upload and Query Image",
+        command=lambda: upload_and_query_image(dropdown.get())) # Pass the selected value
+    # query_by_image_button.pack(pady=10)
+    query_by_image_button.pack(side=tk.LEFT)
+
+    # Create a text entry field for text queries
+    query_by_text_field = tk.Entry(root, width=30)
+    query_by_text_field.pack(side=tk.LEFT, padx=(5, 0))  # Add some padding to the left
+
+    query_by_text_button = tk.Button(
+        root,
+        text='Generate',
+        command=lambda: on_query_button_click(query_by_text_field.get())
+    )
+    query_by_text_button.pack(side=tk.LEFT, padx=(5, 0))
+
     # upload_and_query_image(top_k=5)
     root.mainloop()  # Start the Tkinter main loop
